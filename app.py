@@ -85,11 +85,12 @@ Descripcion:
     draw.text((20, 20), texto, fill='black')
 
     try:
-        foto = PILImage.open(ruta_imagen)
-        foto = foto.resize((250, 180))
-        img.paste(foto, (400, 220))
-    except:
-        pass
+        if os.path.exists(ruta_imagen):
+            foto = PILImage.open(ruta_imagen)
+            foto = foto.resize((250, 180))
+            img.paste(foto, (400, 220))
+    except Exception as e:
+        print("ERROR IMAGEN:", e)
 
     ruta_final = f"reporte_{int(time.time())}.png"
     img.save(ruta_final)
@@ -102,7 +103,7 @@ Descripcion:
 def enviar_correo_imagen(ruta_imagen):
 
     remitente = "dani1riuk@gmail.com"
-    clave = "qmgm tqff dglg jgzu"  # 🔥 PON TU CLAVE DE APP AQUÍ
+    clave = "TU_CLAVE_APP"  # 🔥 REEMPLAZA ESTO
 
     destinatario = "dani1riuk@gmail.com"
 
@@ -182,15 +183,16 @@ def guardar():
 
     db.commit()
 
-    # 🔥 OBTENER NOMBRE
+    # Obtener nombre
     cursor.execute("SELECT nombre FROM trabajadores WHERE ci=?", (ci,))
     nombre = cursor.fetchone()[0]
 
-    # 🔥 CREAR IMAGEN TIPO REPORTE
-    ruta_reporte = crear_reporte_imagen(ci, nombre, descripcion, ruta)
-
-    # 🔥 ENVIAR CORREO
-    enviar_correo_imagen(ruta_reporte)
+    # 🔥 PROTEGIDO (NO ROMPE)
+    try:
+        ruta_reporte = crear_reporte_imagen(ci, nombre, descripcion, ruta)
+        enviar_correo_imagen(ruta_reporte)
+    except Exception as e:
+        print("ERROR CORREO:", e)
 
     return "OK"
 
@@ -244,12 +246,12 @@ def exportar_excel():
                 img.width = 100
                 img.height = 80
                 ws.add_image(img, f'F{fila}')
-        except:
-            pass
+        except Exception as e:
+            print("ERROR EXCEL IMG:", e)
 
         fila += 1
 
-    # 🔥 FORMATO
+    # Formato
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 10
     ws.column_dimensions['C'].width = 15
