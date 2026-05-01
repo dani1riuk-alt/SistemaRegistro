@@ -3,6 +3,7 @@ import sqlite3
 import datetime
 import os
 import time
+import threading
 
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image
@@ -103,7 +104,7 @@ Descripcion:
 def enviar_correo_imagen(ruta_imagen):
 
     remitente = "dani1riuk@gmail.com"
-    clave = "jwvh mgmp aejb rztn"  # 🔥 REEMPLAZA ESTO
+    clave = "jwvh mgmp aejb rztn"  # 🔥 CAMBIAR
 
     destinatario = "dani1riuk@gmail.com"
 
@@ -187,12 +188,17 @@ def guardar():
     cursor.execute("SELECT nombre FROM trabajadores WHERE ci=?", (ci,))
     nombre = cursor.fetchone()[0]
 
-    # 🔥 PROTEGIDO (NO ROMPE)
-    try:
-        ruta_reporte = crear_reporte_imagen(ci, nombre, descripcion, ruta)
-        enviar_correo_imagen(ruta_reporte)
-    except Exception as e:
-        print("ERROR CORREO:", e)
+    # =========================
+    # 🔥 ENVÍO ASÍNCRONO (SOLUCIÓN 502)
+    # =========================
+    def enviar_async(ci, nombre, descripcion, ruta):
+        try:
+            ruta_reporte = crear_reporte_imagen(ci, nombre, descripcion, ruta)
+            enviar_correo_imagen(ruta_reporte)
+        except Exception as e:
+            print("ERROR CORREO:", e)
+
+    threading.Thread(target=enviar_async, args=(ci, nombre, descripcion, ruta)).start()
 
     return "OK"
 
@@ -251,7 +257,7 @@ def exportar_excel():
 
         fila += 1
 
-    # Formato
+    # Formato profesional
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 10
     ws.column_dimensions['C'].width = 15
