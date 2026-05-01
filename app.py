@@ -9,15 +9,50 @@ from openpyxl.drawing.image import Image
 
 app = Flask(__name__)
 
+# =========================
+# 🔥 CREAR BASE DE DATOS AUTOMÁTICAMENTE
+# =========================
+def crear_db():
+    db = sqlite3.connect('database.db')
+    cursor = db.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS trabajadores (
+        ci TEXT PRIMARY KEY,
+        nombre TEXT,
+        cargo TEXT,
+        area TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS registros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha TEXT,
+        hora TEXT,
+        ci TEXT,
+        descripcion TEXT,
+        imagen_url TEXT
+    )
+    """)
+
+    db.commit()
+    db.close()
+
+crear_db()
+
+# =========================
 # Carpeta de imágenes
+# =========================
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Crear carpeta si no existe
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
+# =========================
 # Conexión DB
+# =========================
 def get_db():
     return sqlite3.connect('database.db')
 
@@ -68,17 +103,17 @@ def guardar():
     if not cursor.fetchone():
         return "CI NO VALIDO"
 
-    # Nombre único de imagen
+    # Guardar imagen
     nombre_archivo = str(int(time.time())) + ".png"
     ruta = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-
     imagen.save(ruta)
 
     ahora = datetime.datetime.now()
 
+    # 🔥 INSERT CORREGIDO
     cursor.execute("""
-        INSERT INTO registros (fecha, hora, ci, nombre, descripcion, imagen_url)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO registros (fecha, hora, ci, descripcion, imagen_url)
+        VALUES (?, ?, ?, ?, ?)
     """, (str(ahora.date()), str(ahora.time()), ci, descripcion, ruta))
 
     db.commit()
@@ -108,26 +143,26 @@ def exportar_excel():
     ws = wb.active
     ws.title = "Registros"
 
-    headers = ["Fecha", "Hora", "CI", "Descripción", "Imagen"]
-    ws.append(headers)
+    ws.append(["Fecha", "Hora", "CI", "Descripción", "Imagen"])
 
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM registros")
+    cursor.execute("SELECT fecha, hora, ci, descripcion, imagen_url FROM registros")
 
     fila = 2
 
     for row in cursor.fetchall():
-        ws.cell(row=fila, column=1, value=row[1])
-        ws.cell(row=fila, column=2, value=row[2])
-        ws.cell(row=fila, column=3, value=row[3])
-        ws.cell(row=fila, column=4, value=row[4])
+        ws.cell(row=fila, column=1, value=row[0])
+        ws.cell(row=fila, column=2, value=row[1])
+        ws.cell(row=fila, column=3, value=row[2])
+        ws.cell(row=fila, column=4, value=row[3])
 
         try:
-            img = Image(row[5])
-            img.width = 100
-            img.height = 80
-            ws.add_image(img, f'E{fila}')
+            if os.path.exists(row[4]):
+                img = Image(row[4])
+                img.width = 100
+                img.height = 80
+                ws.add_image(img, f'E{fila}')
         except:
             pass
 
