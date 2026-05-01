@@ -143,28 +143,38 @@ def exportar_excel():
     ws = wb.active
     ws.title = "Registros"
 
-    ws.append(["Fecha", "Hora", "CI", "Descripción", "Imagen"])
+    # ✅ ENCABEZADOS
+    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción", "Imagen"])
 
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT fecha, hora, ci, descripcion, imagen_url FROM registros")
+
+    # 🔥 JOIN PARA TRAER EL NOMBRE
+    cursor.execute("""
+        SELECT r.fecha, r.hora, r.ci, t.nombre, r.descripcion, r.imagen_url
+        FROM registros r
+        LEFT JOIN trabajadores t ON r.ci = t.ci
+    """)
 
     fila = 2
 
     for row in cursor.fetchall():
-        ws.cell(row=fila, column=1, value=row[0])
-        ws.cell(row=fila, column=2, value=row[1])
-        ws.cell(row=fila, column=3, value=row[2])
-        ws.cell(row=fila, column=4, value=row[3])
 
+        ws.cell(row=fila, column=1, value=row[0])  # fecha
+        ws.cell(row=fila, column=2, value=row[1])  # hora
+        ws.cell(row=fila, column=3, value=row[2])  # ci
+        ws.cell(row=fila, column=4, value=row[3])  # nombre
+        ws.cell(row=fila, column=5, value=row[4])  # descripcion
+
+        # 📸 imagen
         try:
-            if os.path.exists(row[4]):
-                img = Image(row[4])
+            if row[5] and os.path.exists(row[5]):
+                img = Image(row[5])
                 img.width = 100
                 img.height = 80
-                ws.add_image(img, f'E{fila}')
-        except:
-            pass
+                ws.add_image(img, f'F{fila}')
+        except Exception as e:
+            print("Error imagen:", e)
 
         fila += 1
 
