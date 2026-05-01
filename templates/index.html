@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Sistema de Registro</title>
+
+<style>
+body { font-family: Arial; background:#f4f6f9; margin:0;}
+.header { background:#1f2d3d; color:white; padding:15px;}
+.container { width:400px; margin:40px auto;}
+.card { background:white; padding:20px; border-radius:10px;}
+input,textarea { width:100%; padding:10px; margin-top:10px;}
+button { width:100%; padding:10px; margin-top:10px; background:#007bff; color:white;}
+.success{color:green;} .error{color:red;}
+</style>
+</head>
+
+<body>
+
+<div class="header">Sistema de Registro</div>
+
+<div class="container">
+<div class="card">
+
+<input type="text" id="ci" placeholder="Ingrese CI">
+<button onclick="validar()">Validar CI</button>
+
+<div id="datos"></div>
+
+<textarea id="descripcion" placeholder="Descripción"></textarea>
+
+<input type="file" id="imagen">
+
+<button onclick="guardar()">Guardar Registro</button>
+
+<div id="mensaje"></div>
+
+</div>
+</div>
+
+<script>
+function validar(){
+fetch('/validar_ci',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({ci:ci.value})
+})
+.then(r=>r.json())
+.then(d=>{
+datos.innerHTML = d.existe ?
+"<div class='success'>✔ "+d.nombre+"</div>" :
+"<div class='error'>CI inválido</div>";
+});
+}
+
+function guardar(){
+let f=new FormData();
+f.append("ci",ci.value);
+f.append("descripcion",descripcion.value);
+f.append("imagen",imagen.files[0]);
+
+fetch('/guardar',{method:'POST',body:f})
+.then(r=>r.text())
+.then(t=>{
+mensaje.innerHTML = t=="OK" ?
+"<div class='success'>Guardado correctamente</div>" :
+"<div class='error'>"+t+"</div>";
+});
+}
+</script>
+
+</body>
+</html>
+<script>
+function guardar(){
+  let f=new FormData();
+  f.append("ci",ci.value);
+  f.append("descripcion",descripcion.value);
+  f.append("imagen",imagen.files[0]);
+
+  fetch('/guardar',{method:'POST',body:f})
+  .then(r=>r.text())
+  .then(t=>{
+    if(t=="OK"){
+      mensaje.innerHTML = "<div class='success'>Guardado correctamente</div>";
+
+      // 🔥 LIMPIAR FORMULARIO
+      ci.value = "";
+      descripcion.value = "";
+      imagen.value = "";
+      datos.innerHTML = "";
+
+    } else {
+      mensaje.innerHTML = "<div class='error'>"+t+"</div>";
+    }
+  });
+}
+</script>
+<hr>
+<button onclick="window.location.href='/exportar_excel'">
+📥 Descargar Reporte Excel
+</button>
