@@ -6,11 +6,20 @@ import time
 
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image
+from openpyxl.styles import Alignment
+
+# 📧 CORREO
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
+
+# 🖼️ IMAGEN
+from PIL import Image as PILImage, ImageDraw
 
 app = Flask(__name__)
 
 # =========================
-# 🔥 CREAR BASE DE DATOS AUTOMÁTICAMENTE
+# 🔥 CREAR BASE DE DATOS
 # =========================
 def crear_db():
     db = sqlite3.connect('database.db')
@@ -42,7 +51,7 @@ def crear_db():
 crear_db()
 
 # =========================
-# Carpeta de imágenes
+# 📁 Carpeta de imágenes
 # =========================
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -51,10 +60,66 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 # =========================
-# Conexión DB
+# 🔌 DB
 # =========================
 def get_db():
     return sqlite3.connect('database.db')
+
+# =========================
+# 🖼️ CREAR IMAGEN REPORTE
+# =========================
+def crear_reporte_imagen(ci, nombre, descripcion, ruta_imagen):
+
+    img = PILImage.new('RGB', (700, 450), color='white')
+    draw = ImageDraw.Draw(img)
+
+    texto = f"""REPORTE DE ANOMALIA
+
+CI: {ci}
+Nombre: {nombre}
+
+Descripcion:
+{descripcion}
+"""
+
+    draw.text((20, 20), texto, fill='black')
+
+    try:
+        foto = PILImage.open(ruta_imagen)
+        foto = foto.resize((250, 180))
+        img.paste(foto, (400, 220))
+    except:
+        pass
+
+    ruta_final = f"reporte_{int(time.time())}.png"
+    img.save(ruta_final)
+
+    return ruta_final
+
+# =========================
+# 📧 ENVIAR CORREO
+# =========================
+def enviar_correo_imagen(ruta_imagen):
+
+    remitente = "dani1riuk@gmail.com"
+    clave = "TU_CLAVE_APP"  # 🔥 PON TU CLAVE DE APP AQUÍ
+
+    destinatario = "dani1riuk@gmail.com"
+
+    msg = MIMEMultipart()
+    msg['Subject'] = "🚨 Nuevo reporte registrado"
+    msg['From'] = remitente
+    msg['To'] = destinatario
+
+    with open(ruta_imagen, 'rb') as f:
+        img = MIMEImage(f.read())
+        msg.attach(img)
+
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.starttls()
+    server.login(remitente, clave)
+    server.send_message(msg)
+    server.quit()
 
 # =========================
 # 🏠 HOME
@@ -87,7 +152,7 @@ def validar_ci():
         return jsonify({"existe": False})
 
 # =========================
-# 💾 GUARDAR REGISTRO
+# 💾 GUARDAR
 # =========================
 @app.route('/guardar', methods=['POST'])
 def guardar():
@@ -110,13 +175,22 @@ def guardar():
 
     ahora = datetime.datetime.now()
 
-    # 🔥 INSERT CORREGIDO
     cursor.execute("""
         INSERT INTO registros (fecha, hora, ci, descripcion, imagen_url)
         VALUES (?, ?, ?, ?, ?)
     """, (str(ahora.date()), str(ahora.time()), ci, descripcion, ruta))
 
     db.commit()
+
+    # 🔥 OBTENER NOMBRE
+    cursor.execute("SELECT nombre FROM trabajadores WHERE ci=?", (ci,))
+    nombre = cursor.fetchone()[0]
+
+    # 🔥 CREAR IMAGEN TIPO REPORTE
+    ruta_reporte = crear_reporte_imagen(ci, nombre, descripcion, ruta)
+
+    # 🔥 ENVIAR CORREO
+    enviar_correo_imagen(ruta_reporte)
 
     return "OK"
 
@@ -143,13 +217,11 @@ def exportar_excel():
     ws = wb.active
     ws.title = "Registros"
 
-    # ✅ ENCABEZADOS
     ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción", "Imagen"])
 
     db = get_db()
     cursor = db.cursor()
 
-    # 🔥 JOIN PARA TRAER EL NOMBRE
     cursor.execute("""
         SELECT r.fecha, r.hora, r.ci, t.nombre, r.descripcion, r.imagen_url
         FROM registros r
@@ -160,23 +232,37 @@ def exportar_excel():
 
     for row in cursor.fetchall():
 
-        ws.cell(row=fila, column=1, value=row[0])  # fecha
-        ws.cell(row=fila, column=2, value=row[1])  # hora
-        ws.cell(row=fila, column=3, value=row[2])  # ci
-        ws.cell(row=fila, column=4, value=row[3])  # nombre
-        ws.cell(row=fila, column=5, value=row[4])  # descripcion
+        ws.cell(row=fila, column=1, value=row[0])
+        ws.cell(row=fila, column=2, value=row[1])
+        ws.cell(row=fila, column=3, value=row[2])
+        ws.cell(row=fila, column=4, value=row[3])
+        ws.cell(row=fila, column=5, value=row[4])
 
-        # 📸 imagen
         try:
             if row[5] and os.path.exists(row[5]):
                 img = Image(row[5])
                 img.width = 100
                 img.height = 80
                 ws.add_image(img, f'F{fila}')
-        except Exception as e:
-            print("Error imagen:", e)
+        except:
+            pass
 
         fila += 1
+
+    # 🔥 FORMATO
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 10
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 25
+    ws.column_dimensions['E'].width = 40
+    ws.column_dimensions['F'].width = 20
+
+    for i in range(2, fila):
+        ws.row_dimensions[i].height = 80
+
+    for row in ws.iter_rows(min_row=2, max_row=fila, min_col=1, max_col=5):
+        for cell in row:
+            cell.alignment = Alignment(wrap_text=True)
 
     archivo = "reporte.xlsx"
     wb.save(archivo)
@@ -208,13 +294,6 @@ def agregar_trabajador():
 
     except:
         return "CI YA EXISTE"
-
-# =========================
-# 🧑‍💼 VISTA TRABAJADORES
-# =========================
-@app.route('/trabajadores')
-def trabajadores():
-    return render_template('trabajadores.html')
 
 # =========================
 # ▶️ RUN
