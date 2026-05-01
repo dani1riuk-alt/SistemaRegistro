@@ -102,7 +102,7 @@ Descripcion:
 def enviar_correo_imagen(ruta_imagen):
 
     remitente = "dani1riuk@gmail.com"
-    clave = "TU_CLAVE_APP"  # 🔥 PON TU CLAVE DE APP AQUÍ
+    clave = "qmgm tqff dglg jgzu"  # 🔥 PON TU CLAVE DE APP AQUÍ
 
     destinatario = "dani1riuk@gmail.com"
 
