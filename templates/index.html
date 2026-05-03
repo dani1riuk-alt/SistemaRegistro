@@ -68,6 +68,9 @@ button:hover { opacity:0.95; }
 </div>
 
 <script>
+const ci = document.getElementById('ci');
+const mensaje = document.getElementById('mensaje');
+const datos = document.getElementById('datos');
 let anomaliaIndex = 1;
 
 function agregarAnomalia() {
@@ -200,8 +203,11 @@ function guardar(){
   .then(blob => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const formattedTime = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
     a.href = url;
-    a.download = 'informe_' + ciValue + '.xlsx';
+    a.download = `informe_${ciValue}_${formattedDate}_${formattedTime}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
