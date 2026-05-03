@@ -3,19 +3,10 @@ import sqlite3
 import datetime
 import os
 import time
-import threading
 
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment
-
-# 📧 CORREO
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.image import MIMEImage
-
-# 🖼️ IMAGEN
-from PIL import Image as PILImage, ImageDraw
 
 app = Flask(__name__)
 
@@ -42,9 +33,25 @@ def crear_db():
         hora TEXT,
         ci TEXT,
         descripcion TEXT,
+        motivo_anomalia TEXT,
+        correccion_hecha TEXT,
+        requerido TEXT,
         imagen_url TEXT
     )
     """)
+
+    try:
+        cursor.execute("ALTER TABLE registros ADD COLUMN motivo_anomalia TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE registros ADD COLUMN correccion_hecha TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE registros ADD COLUMN requerido TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     db.commit()
     db.close()
@@ -67,63 +74,6 @@ def get_db():
     return sqlite3.connect('database.db')
 
 # =========================
-# 🖼️ CREAR IMAGEN REPORTE
-# =========================
-def crear_reporte_imagen(ci, nombre, descripcion, ruta_imagen):
-
-    img = PILImage.new('RGB', (700, 450), color='white')
-    draw = ImageDraw.Draw(img)
-
-    texto = f"""REPORTE DE ANOMALIA
-
-CI: {ci}
-Nombre: {nombre}
-
-Descripcion:
-{descripcion}
-"""
-
-    draw.text((20, 20), texto, fill='black')
-
-    try:
-        if os.path.exists(ruta_imagen):
-            foto = PILImage.open(ruta_imagen)
-            foto = foto.resize((250, 180))
-            img.paste(foto, (400, 220))
-    except Exception as e:
-        print("ERROR IMAGEN:", e)
-
-    ruta_final = f"reporte_{int(time.time())}.png"
-    img.save(ruta_final)
-
-    return ruta_final
-
-# =========================
-# 📧 ENVIAR CORREO
-# =========================
-def enviar_correo_imagen(ruta_imagen):
-
-    remitente = "dani1riuk@gmail.com"
-    clave = "jwvh mgmp aejb rztn"  # 🔥 CAMBIAR
-
-    destinatario = "dani1riuk@gmail.com"
-
-    msg = MIMEMultipart()
-    msg['Subject'] = "🚨 Nuevo reporte registrado"
-    msg['From'] = remitente
-    msg['To'] = destinatario
-
-    with open(ruta_imagen, 'rb') as f:
-        img = MIMEImage(f.read())
-        msg.attach(img)
-
-    server = smtplib.SMTP('smtp.gmail.com', 587)
-    server.starttls()
-    server.login(remitente, clave)
-    server.send_message(msg)
-    server.quit()
-
-# =========================
 # 🏠 HOME
 # =========================
 @app.route('/')
@@ -142,6 +92,7 @@ def validar_ci():
 
     cursor.execute("SELECT nombre, cargo, area FROM trabajadores WHERE ci=?", (ci,))
     data = cursor.fetchone()
+    db.close()
 
     if data:
         return jsonify({
@@ -158,19 +109,24 @@ def validar_ci():
 # =========================
 @app.route('/guardar', methods=['POST'])
 def guardar():
+    ci = request.form.get('ci', '').strip()
+    descripcion = request.form.get('descripcion', '').strip()
+    motivo_anomalia = request.form.get('motivo_anomalia', '').strip()
+    correccion_hecha = request.form.get('correccion_hecha', '').strip()
+    requerido = request.form.get('requerido', '').strip()
+    imagen = request.files.get('imagen')
 
-    ci = request.form['ci']
-    descripcion = request.form['descripcion']
-    imagen = request.files['imagen']
+    if not ci or not descripcion or not motivo_anomalia or not correccion_hecha or not requerido or not imagen:
+        return "Por favor completa todos los campos y carga una imagen", 400
 
     db = get_db()
     cursor = db.cursor()
 
     cursor.execute("SELECT * FROM trabajadores WHERE ci=?", (ci,))
     if not cursor.fetchone():
-        return "CI NO VALIDO"
+        db.close()
+        return "CI NO VALIDO", 400
 
-    # Guardar imagen
     nombre_archivo = str(int(time.time())) + ".png"
     ruta = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
     imagen.save(ruta)
@@ -178,33 +134,61 @@ def guardar():
     ahora = datetime.datetime.now()
 
     cursor.execute("""
-        INSERT INTO registros (fecha, hora, ci, descripcion, imagen_url)
-        VALUES (?, ?, ?, ?, ?)
-    """, (str(ahora.date()), str(ahora.time()), ci, descripcion, ruta))
-
+        INSERT INTO registros (fecha, hora, ci, descripcion, motivo_anomalia, correccion_hecha, requerido, imagen_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        str(ahora.date()),
+        str(ahora.time()),
+        ci,
+        descripcion,
+        motivo_anomalia,
+        correccion_hecha,
+        requerido,
+        ruta
+    ))
     db.commit()
 
-    # Obtener nombre
     cursor.execute("SELECT nombre FROM trabajadores WHERE ci=?", (ci,))
     nombre = cursor.fetchone()[0]
+    db.close()
 
-    # =========================
-    # 🔥 ENVÍO ASÍNCRONO (SOLUCIÓN 502)
-    # =========================
-    def enviar_async(ci, nombre, descripcion, ruta):
-        try:
-            ruta_reporte = crear_reporte_imagen(ci, nombre, descripcion, ruta)
-            enviar_correo_imagen(ruta_reporte)
-        except Exception as e:
-            print("ERROR CORREO:", e)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Informe"
 
-    threading.Thread(target=enviar_async, args=(ci, nombre, descripcion, ruta)).start()
+    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción", "Motivo de Anomalía", "Corrección Hecha", "Requerido", "Imagen"])
+    ws.append([str(ahora.date()), str(ahora.time()), ci, nombre, descripcion, motivo_anomalia, correccion_hecha, requerido, ""])
 
-    return "OK"
+    try:
+        if os.path.exists(ruta):
+            img = Image(ruta)
+            img.width = 150
+            img.height = 120
+            ws.add_image(img, 'I2')
+    except Exception:
+        pass
+
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 10
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 25
+    ws.column_dimensions['E'].width = 40
+    ws.column_dimensions['F'].width = 40
+    ws.column_dimensions['G'].width = 40
+    ws.column_dimensions['H'].width = 35
+    ws.column_dimensions['I'].width = 20
+    ws.row_dimensions[2].height = 120
+
+    for cell in ws[2]:
+        cell.alignment = Alignment(wrap_text=True)
+
+    archivo = f"informe_{ci}_{ahora.strftime('%Y%m%d_%H%M%S')}.xlsx"
+    wb.save(archivo)
+
+    return send_file(archivo, as_attachment=True)
 
 # =========================
 # 📊 VER REGISTROS
-# =========================
 @app.route('/registros')
 def ver_registros():
     db = get_db()
@@ -225,13 +209,13 @@ def exportar_excel():
     ws = wb.active
     ws.title = "Registros"
 
-    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción", "Imagen"])
+    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción", "Motivo de Anomalía", "Corrección Hecha", "Requerido", "Imagen"])
 
     db = get_db()
     cursor = db.cursor()
 
     cursor.execute("""
-        SELECT r.fecha, r.hora, r.ci, t.nombre, r.descripcion, r.imagen_url
+        SELECT r.fecha, r.hora, r.ci, t.nombre, r.descripcion, r.motivo_anomalia, r.correccion_hecha, r.requerido, r.imagen_url
         FROM registros r
         LEFT JOIN trabajadores t ON r.ci = t.ci
     """)
@@ -245,63 +229,45 @@ def exportar_excel():
         ws.cell(row=fila, column=3, value=row[2])
         ws.cell(row=fila, column=4, value=row[3])
         ws.cell(row=fila, column=5, value=row[4])
+        ws.cell(row=fila, column=6, value=row[5])
+        ws.cell(row=fila, column=7, value=row[6])
+        ws.cell(row=fila, column=8, value=row[7])
 
         try:
-            if row[5] and os.path.exists(row[5]):
-                img = Image(row[5])
+            if row[8] and os.path.exists(row[8]):
+                img = Image(row[8])
                 img.width = 100
                 img.height = 80
-                ws.add_image(img, f'F{fila}')
-        except Exception as e:
-            print("ERROR EXCEL IMG:", e)
+                ws.add_image(img, f'I{fila}')
+        except Exception:
+            pass
 
         fila += 1
 
-    # Formato profesional
+    # Formato
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 10
     ws.column_dimensions['C'].width = 15
     ws.column_dimensions['D'].width = 25
     ws.column_dimensions['E'].width = 40
-    ws.column_dimensions['F'].width = 20
+    ws.column_dimensions['F'].width = 40
+    ws.column_dimensions['G'].width = 40
+    ws.column_dimensions['H'].width = 35
+    ws.column_dimensions['I'].width = 20
 
     for i in range(2, fila):
         ws.row_dimensions[i].height = 80
 
-    for row in ws.iter_rows(min_row=2, max_row=fila, min_col=1, max_col=5):
+    for row in ws.iter_rows(min_row=2, max_row=fila, min_col=1, max_col=8):
         for cell in row:
             cell.alignment = Alignment(wrap_text=True)
+
+    db.close()
 
     archivo = "reporte.xlsx"
     wb.save(archivo)
 
     return send_file(archivo, as_attachment=True)
-
-# =========================
-# 👨‍🔧 AGREGAR TRABAJADOR
-# =========================
-@app.route('/agregar_trabajador', methods=['POST'])
-def agregar_trabajador():
-
-    ci = request.form['ci']
-    nombre = request.form['nombre']
-    cargo = request.form['cargo']
-    area = request.form['area']
-
-    db = get_db()
-    cursor = db.cursor()
-
-    try:
-        cursor.execute("""
-        INSERT INTO trabajadores (ci, nombre, cargo, area)
-        VALUES (?, ?, ?, ?)
-        """, (ci, nombre, cargo, area))
-
-        db.commit()
-        return "OK"
-
-    except:
-        return "CI YA EXISTE"
 
 # =========================
 # ▶️ RUN

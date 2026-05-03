@@ -7,10 +7,11 @@
 <style>
 body { font-family: Arial; background:#f4f6f9; margin:0;}
 .header { background:#1f2d3d; color:white; padding:15px;}
-.container { width:400px; margin:40px auto;}
+.container { width:420px; margin:40px auto;}
 .card { background:white; padding:20px; border-radius:10px;}
-input,textarea { width:100%; padding:10px; margin-top:10px;}
-button { width:100%; padding:10px; margin-top:10px; background:#007bff; color:white;}
+input,textarea { width:100%; padding:10px; margin-top:10px; box-sizing:border-box;}
+button { width:100%; padding:10px; margin-top:10px; background:#007bff; color:white; border:none; cursor:pointer;}
+button:hover { opacity:0.95; }
 .success{color:green;} .error{color:red;}
 </style>
 </head>
@@ -28,10 +29,13 @@ button { width:100%; padding:10px; margin-top:10px; background:#007bff; color:wh
 <div id="datos"></div>
 
 <textarea id="descripcion" placeholder="Descripción"></textarea>
+<textarea id="motivo_anomalia" placeholder="Motivo o causa de anomalía"></textarea>
+<textarea id="correccion_hecha" placeholder="Qué se hizo para corregir"></textarea>
+<textarea id="requerido" placeholder="Qué se requiere"></textarea>
 
-<input type="file" id="imagen">
+<input type="file" id="imagen" accept="image/*">
 
-<button onclick="guardar()">Guardar Registro</button>
+<button onclick="guardar()">Guardar y descargar informe</button>
 
 <div id="mensaje"></div>
 
@@ -40,63 +44,84 @@ button { width:100%; padding:10px; margin-top:10px; background:#007bff; color:wh
 
 <script>
 function validar(){
-fetch('/validar_ci',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({ci:ci.value})
-})
-.then(r=>r.json())
-.then(d=>{
-datos.innerHTML = d.existe ?
-"<div class='success'>✔ "+d.nombre+"</div>" :
-"<div class='error'>CI inválido</div>";
-});
+  fetch('/validar_ci', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ci: ci.value.trim()})
+  })
+  .then(r => r.json())
+  .then(d => {
+    datos.innerHTML = d.existe ?
+      "<div class='success'>✔ " + d.nombre + "</div>" :
+      "<div class='error'>CI inválido</div>";
+  });
+}
+
+function limpiarFormulario(){
+  ci.value = '';
+  descripcion.value = '';
+  motivo_anomalia.value = '';
+  correccion_hecha.value = '';
+  requerido.value = '';
+  imagen.value = '';
+  datos.innerHTML = '';
 }
 
 function guardar(){
-let f=new FormData();
-f.append("ci",ci.value);
-f.append("descripcion",descripcion.value);
-f.append("imagen",imagen.files[0]);
+  const datosRequeridos = [
+    {campo: ci.value.trim(), mensaje: 'CI'},
+    {campo: descripcion.value.trim(), mensaje: 'Descripción'},
+    {campo: motivo_anomalia.value.trim(), mensaje: 'Motivo o causa de anomalía'},
+    {campo: correccion_hecha.value.trim(), mensaje: 'Qué se hizo para corregir'},
+    {campo: requerido.value.trim(), mensaje: 'Qué se requiere'}
+  ];
 
-fetch('/guardar',{method:'POST',body:f})
-.then(r=>r.text())
-.then(t=>{
-mensaje.innerHTML = t=="OK" ?
-"<div class='success'>Guardado correctamente</div>" :
-"<div class='error'>"+t+"</div>";
-});
-}
-</script>
+  const imagenSeleccionada = imagen.files[0];
 
-</body>
-</html>
-<script>
-function guardar(){
-  let f=new FormData();
-  f.append("ci",ci.value);
-  f.append("descripcion",descripcion.value);
-  f.append("imagen",imagen.files[0]);
+  if (!datosRequeridos.every(item => item.campo) || !imagenSeleccionada) {
+    mensaje.innerHTML = "<div class='error'>Por favor completa todos los campos y carga una imagen.</div>";
+    return;
+  }
 
-  fetch('/guardar',{method:'POST',body:f})
-  .then(r=>r.text())
-  .then(t=>{
-    if(t=="OK"){
-      mensaje.innerHTML = "<div class='success'>Guardado correctamente</div>";
+  const formData = new FormData();
+  formData.append('ci', ci.value.trim());
+  formData.append('descripcion', descripcion.value.trim());
+  formData.append('motivo_anomalia', motivo_anomalia.value.trim());
+  formData.append('correccion_hecha', correccion_hecha.value.trim());
+  formData.append('requerido', requerido.value.trim());
+  formData.append('imagen', imagenSeleccionada);
 
-      // 🔥 LIMPIAR FORMULARIO
-      ci.value = "";
-      descripcion.value = "";
-      imagen.value = "";
-      datos.innerHTML = "";
-
-    } else {
-      mensaje.innerHTML = "<div class='error'>"+t+"</div>";
+  fetch('/guardar', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => {
+    if (response.ok) {
+      return response.blob();
     }
+    return response.text().then(text => { throw new Error(text || 'Error al guardar.'); });
+  })
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'informe_' + ci.value.trim() + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    mensaje.innerHTML = "<div class='success'>Informe descargado correctamente</div>";
+    limpiarFormulario();
+  })
+  .catch(error => {
+    mensaje.innerHTML = "<div class='error'>" + error.message + "</div>";
   });
 }
 </script>
+
 <hr>
-<button onclick="window.location.href='/exportar_excel'">
-📥 Descargar Reporte Excel
-</button>
+<button onclick="window.location.href='/exportar_excel'">📥 Descargar Reporte Excel</button>
+
+</body>
+</html>

@@ -22,9 +22,26 @@ CREATE TABLE IF NOT EXISTS registros (
     hora TEXT,
     ci TEXT,
     descripcion TEXT,
+    motivo_anomalia TEXT,
+    correccion_hecha TEXT,
+    requerido TEXT,
     imagen_url TEXT
 )
 """)
+
+# Agregar columnas si no existen (para bases de datos existentes)
+try:
+    cursor.execute("ALTER TABLE registros ADD COLUMN motivo_anomalia TEXT")
+except sqlite3.OperationalError:
+    pass
+try:
+    cursor.execute("ALTER TABLE registros ADD COLUMN correccion_hecha TEXT")
+except sqlite3.OperationalError:
+    pass
+try:
+    cursor.execute("ALTER TABLE registros ADD COLUMN requerido TEXT")
+except sqlite3.OperationalError:
+    pass
 
 # Insertar trabajador de prueba
 cursor.execute("""
