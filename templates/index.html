@@ -28,10 +28,7 @@ button:hover { opacity:0.95; }
 <div class="container">
 <div class="card">
 
-<input type="text" id="ci" placeholder="Ingrese CI">
-<button onclick="validar()">Validar CI</button>
-
-<div id="datos"></div>
+<input type="text" id="nombre" placeholder="Ingrese nombre completo">
 
 <div id="anomalias-container">
   <div class="anomalia-group">
@@ -60,7 +57,7 @@ button:hover { opacity:0.95; }
 
 <button class="add-btn" onclick="agregarAnomalia()">Agregar otra anomalía</button>
 
-<button onclick="guardar()">Guardar y descargar informe</button>
+<button onclick="guardar()">Guardar y descargar</button>
 
 <div id="mensaje"></div>
 
@@ -68,9 +65,8 @@ button:hover { opacity:0.95; }
 </div>
 
 <script>
-const ci = document.getElementById('ci');
+const nombre = document.getElementById('nombre');
 const mensaje = document.getElementById('mensaje');
-const datos = document.getElementById('datos');
 let anomaliaIndex = 1;
 
 function agregarAnomalia() {
@@ -118,7 +114,7 @@ function removerAnomalia(btn) {
 }
 
 function limpiarFormulario(){
-  ci.value = '';
+  nombre.value = '';
   document.getElementById('anomalias-container').innerHTML = `
     <div class="anomalia-group">
       <div class="anomalia-row">
@@ -144,13 +140,12 @@ function limpiarFormulario(){
     </div>
   `;
   anomaliaIndex = 1;
-  datos.innerHTML = '';
 }
 
 function guardar(){
-  const ciValue = ci.value.trim();
-  if (!ciValue) {
-    mensaje.innerHTML = "<div class='error'>Por favor ingresa CI.</div>";
+  const nombreValue = nombre.value.trim();
+  if (!nombreValue) {
+    mensaje.innerHTML = "<div class='error'>Por favor ingresa nombre completo.</div>";
     return;
   }
 
@@ -179,7 +174,7 @@ function guardar(){
   }
 
   const formData = new FormData();
-  formData.append('ci', ciValue);
+  formData.append('nombre', nombreValue);
   anomalias.forEach((anomalia, index) => {
     formData.append(`anomalia_${index}`, JSON.stringify({
       descripcion: anomalia.descripcion,
@@ -207,7 +202,7 @@ function guardar(){
     const formattedDate = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const formattedTime = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
     a.href = url;
-    a.download = `informe_${ciValue}_${formattedDate}_${formattedTime}.xlsx`;
+    a.download = `informe_${nombreValue}_${formattedDate}_${formattedTime}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -221,41 +216,8 @@ function guardar(){
   });
 }
 
-function validar(){
-  const ciValue = ci.value.trim();
-  console.log('Validando CI:', ciValue);
-  if (!ciValue) {
-    datos.innerHTML = "<div class='error'>Ingresa un CI válido</div>";
-    return;
-  }
-  datos.innerHTML = "Validando...";
-  fetch('/validar_ci', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ci: ciValue})
-  })
-  .then(r => {
-    console.log('Respuesta status:', r.status);
-    if (!r.ok) {
-      throw new Error('Error en la validación: ' + r.status);
-    }
-    return r.json();
-  })
-  .then(d => {
-    console.log('Respuesta validación:', d);
-    datos.innerHTML = d.existe ?
-      "<div class='success'>✔ " + d.nombre + "</div>" :
-      "<div class='error'>CI inválido</div>";
-  })
-  .catch(error => {
-    console.error('Error en validar:', error);
-    datos.innerHTML = "<div class='error'>Error al validar CI: " + error.message + "</div>";
-  });
-}
-</script>
 
-<hr>
-<button onclick="window.location.href='/exportar_excel'">📥 Descargar Reporte Excel</button>
+</script>
 
 </body>
 </html>

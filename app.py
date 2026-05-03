@@ -32,7 +32,7 @@ def crear_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         fecha TEXT,
         hora TEXT,
-        ci TEXT,
+        nombre TEXT,
         descripcion TEXT,
         motivo_anomalia TEXT,
         correccion_hecha TEXT,
@@ -51,6 +51,10 @@ def crear_db():
         pass
     try:
         cursor.execute("ALTER TABLE registros ADD COLUMN requerido TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE registros ADD COLUMN nombre TEXT")
     except sqlite3.OperationalError:
         pass
 
@@ -82,38 +86,14 @@ def index():
     return render_template('index.html')
 
 # =========================
-# 🔍 VALIDAR CI
-# =========================
-@app.route('/validar_ci', methods=['POST'])
-def validar_ci():
-    ci = request.json['ci']
-
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT nombre, cargo, area FROM trabajadores WHERE ci=?", (ci,))
-    data = cursor.fetchone()
-    db.close()
-
-    if data:
-        return jsonify({
-            "existe": True,
-            "nombre": data[0],
-            "cargo": data[1],
-            "area": data[2]
-        })
-    else:
-        return jsonify({"existe": False})
-
-# =========================
-# 💾 GUARDAR
+# � GUARDAR
 # =========================
 @app.route('/guardar', methods=['POST'])
 def guardar():
-    ci = request.form.get('ci', '').strip()
+    nombre = request.form.get('nombre', '').strip()
 
-    if not ci:
-        return "Por favor ingresa CI", 400
+    if not nombre:
+        return "Por favor ingresa nombre completo", 400
 
     anomalias = []
     imagenes = []
@@ -134,20 +114,12 @@ def guardar():
     if not anomalias:
         return "Debe haber al menos una anomalía completa con imagen", 400
 
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT * FROM trabajadores WHERE ci=?", (ci,))
-    if not cursor.fetchone():
-        db.close()
-        return "CI NO VALIDO", 400
-
     ahora = datetime.datetime.now()
     fecha = ahora.strftime('%Y-%m-%d')
     hora = ahora.strftime('%H:%M')
 
-    cursor.execute("SELECT nombre FROM trabajadores WHERE ci=?", (ci,))
-    nombre = cursor.fetchone()[0]
+    db = get_db()
+    cursor = db.cursor()
 
     rutas_imagenes = []
     for i, imagen in enumerate(imagenes):
@@ -159,12 +131,12 @@ def guardar():
     # Insertar cada anomalía como un registro separado
     for i, anomalia in enumerate(anomalias):
         cursor.execute("""
-            INSERT INTO registros (fecha, hora, ci, descripcion, motivo_anomalia, correccion_hecha, requerido, imagen_url)
+            INSERT INTO registros (fecha, hora, nombre, descripcion, motivo_anomalia, correccion_hecha, requerido, imagen_url)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             fecha,
             hora,
-            ci,
+            nombre,
             anomalia['descripcion'],
             anomalia['causa'],
             anomalia['correccion'],
@@ -180,26 +152,25 @@ def guardar():
     ws = wb.active
     ws.title = "Informe"
 
-    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción de anomalía", "¿Cuál fue la posible causa de la anomalía?", "¿Qué se hizo para corregir?", "¿Qué es lo que se requiere?", "Imagen"])
+    ws.append(["Fecha", "Hora", "Nombre", "Descripción de anomalía", "¿Cuál fue la posible causa de la anomalía?", "¿Qué se hizo para corregir?", "¿Qué es lo que se requiere?", "Imagen"])
 
     fila = 2
     for i, anomalia in enumerate(anomalias):
         ws.cell(row=fila, column=1, value=fecha)
         ws.cell(row=fila, column=2, value=hora)
-        ws.cell(row=fila, column=3, value=ci)
-        ws.cell(row=fila, column=4, value=nombre)
-        ws.cell(row=fila, column=5, value=anomalia['descripcion'])
-        ws.cell(row=fila, column=6, value=anomalia['causa'])
-        ws.cell(row=fila, column=7, value=anomalia['correccion'])
-        ws.cell(row=fila, column=8, value=anomalia['requerido'])
-        ws.cell(row=fila, column=9, value="")
+        ws.cell(row=fila, column=3, value=nombre)
+        ws.cell(row=fila, column=4, value=anomalia['descripcion'])
+        ws.cell(row=fila, column=5, value=anomalia['causa'])
+        ws.cell(row=fila, column=6, value=anomalia['correccion'])
+        ws.cell(row=fila, column=7, value=anomalia['requerido'])
+        ws.cell(row=fila, column=8, value="")
 
         try:
             if os.path.exists(rutas_imagenes[i]):
                 img = Image(rutas_imagenes[i])
                 img.width = 150
                 img.height = 120
-                ws.add_image(img, f'I{fila}')
+                ws.add_image(img, f'H{fila}')
         except Exception:
             pass
 
@@ -207,22 +178,22 @@ def guardar():
 
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 10
-    ws.column_dimensions['C'].width = 15
-    ws.column_dimensions['D'].width = 25
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 40
     ws.column_dimensions['E'].width = 40
     ws.column_dimensions['F'].width = 40
     ws.column_dimensions['G'].width = 40
-    ws.column_dimensions['H'].width = 35
-    ws.column_dimensions['I'].width = 20
+    ws.column_dimensions['H'].width = 20
 
     for i in range(2, fila):
         ws.row_dimensions[i].height = 120
 
-    for row in ws.iter_rows(min_row=2, max_row=fila-1, min_col=1, max_col=8):
+    for row in ws.iter_rows(min_row=2, max_row=fila-1, min_col=1, max_col=7):
         for cell in row:
             cell.alignment = Alignment(wrap_text=True)
 
-    archivo = f"informe_{ci}_{ahora.strftime('%Y%m%d_%H%M')}.xlsx"
+    ahora = datetime.datetime.now()
+    archivo = f"informe_{nombre}_{ahora.strftime('%Y%m%d_%H%M')}.xlsx"
     wb.save(archivo)
 
     return send_file(archivo, as_attachment=True)
@@ -249,15 +220,14 @@ def exportar_excel():
     ws = wb.active
     ws.title = "Registros"
 
-    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción de anomalía", "¿Cuál fue la posible causa de la anomalía?", "¿Qué se hizo para corregir?", "¿Qué es lo que se requiere?", "Imagen"])
+    ws.append(["Fecha", "Hora", "Nombre", "Descripción de anomalía", "¿Cuál fue la posible causa de la anomalía?", "¿Qué se hizo para corregir?", "¿Qué es lo que se requiere?", "Imagen"])
 
     db = get_db()
     cursor = db.cursor()
 
     cursor.execute("""
-        SELECT r.fecha, r.hora, r.ci, t.nombre, r.descripcion, r.motivo_anomalia, r.correccion_hecha, r.requerido, r.imagen_url
+        SELECT r.fecha, r.hora, r.nombre, r.descripcion, r.motivo_anomalia, r.correccion_hecha, r.requerido, r.imagen_url
         FROM registros r
-        LEFT JOIN trabajadores t ON r.ci = t.ci
     """)
 
     fila = 2
@@ -271,11 +241,10 @@ def exportar_excel():
         ws.cell(row=fila, column=5, value=row[4])
         ws.cell(row=fila, column=6, value=row[5])
         ws.cell(row=fila, column=7, value=row[6])
-        ws.cell(row=fila, column=8, value=row[7])
 
         try:
-            if row[8] and os.path.exists(row[8]):
-                img = Image(row[8])
+            if row[7] and os.path.exists(row[7]):
+                img = Image(row[7])
                 img.width = 100
                 img.height = 80
                 ws.add_image(img, f'I{fila}')
@@ -287,18 +256,17 @@ def exportar_excel():
     # Formato
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 10
-    ws.column_dimensions['C'].width = 15
-    ws.column_dimensions['D'].width = 25
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 40
     ws.column_dimensions['E'].width = 40
     ws.column_dimensions['F'].width = 40
     ws.column_dimensions['G'].width = 40
-    ws.column_dimensions['H'].width = 35
-    ws.column_dimensions['I'].width = 20
+    ws.column_dimensions['H'].width = 20
 
     for i in range(2, fila):
         ws.row_dimensions[i].height = 80
 
-    for row in ws.iter_rows(min_row=2, max_row=fila, min_col=1, max_col=8):
+    for row in ws.iter_rows(min_row=2, max_row=fila, min_col=1, max_col=7):
         for cell in row:
             cell.alignment = Alignment(wrap_text=True)
 
