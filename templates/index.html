@@ -7,12 +7,17 @@
 <style>
 body { font-family: Arial; background:#f4f6f9; margin:0;}
 .header { background:#1f2d3d; color:white; padding:15px;}
-.container { width:420px; margin:40px auto;}
+.container { width:600px; margin:40px auto;}
 .card { background:white; padding:20px; border-radius:10px;}
+.anomalia-row { display: flex; margin-bottom: 15px; align-items: flex-start;}
+.anomalia-row label { width: 250px; font-weight: bold; margin-right: 10px; padding-top: 10px;}
+.anomalia-row textarea { flex: 1; padding:10px; box-sizing:border-box; resize: vertical;}
 input,textarea { width:100%; padding:10px; margin-top:10px; box-sizing:border-box;}
 button { width:100%; padding:10px; margin-top:10px; background:#007bff; color:white; border:none; cursor:pointer;}
 button:hover { opacity:0.95; }
 .success{color:green;} .error{color:red;}
+.add-btn { background:#28a745; margin-bottom: 20px;}
+.remove-btn { background:#dc3545; width: auto; margin-left: 10px; padding: 5px 10px;}
 </style>
 </head>
 
@@ -28,12 +33,32 @@ button:hover { opacity:0.95; }
 
 <div id="datos"></div>
 
-<textarea id="descripcion" placeholder="Descripción"></textarea>
-<textarea id="motivo_anomalia" placeholder="Motivo o causa de anomalía"></textarea>
-<textarea id="correccion_hecha" placeholder="Qué se hizo para corregir"></textarea>
-<textarea id="requerido" placeholder="Qué se requiere"></textarea>
+<div id="anomalias-container">
+  <div class="anomalia-group">
+    <div class="anomalia-row">
+      <label>Descripción de anomalía</label>
+      <textarea placeholder="Describe la anomalía"></textarea>
+    </div>
+    <div class="anomalia-row">
+      <label>¿Cuál fue la posible causa de la anomalía?</label>
+      <textarea placeholder="Indica la causa posible"></textarea>
+    </div>
+    <div class="anomalia-row">
+      <label>¿Qué se hizo para corregir?</label>
+      <textarea placeholder="Describe las acciones tomadas"></textarea>
+    </div>
+    <div class="anomalia-row">
+      <label>¿Qué es lo que se requiere?</label>
+      <textarea placeholder="Indica los requerimientos"></textarea>
+    </div>
+    <div class="anomalia-row">
+      <label>Imagen de la anomalía</label>
+      <input type="file" accept="image/*" class="imagen-anomalia">
+    </div>
+  </div>
+</div>
 
-<input type="file" id="imagen" accept="image/*">
+<button class="add-btn" onclick="agregarAnomalia()">Agregar otra anomalía</button>
 
 <button onclick="guardar()">Guardar y descargar informe</button>
 
@@ -43,53 +68,124 @@ button:hover { opacity:0.95; }
 </div>
 
 <script>
-function validar(){
-  fetch('/validar_ci', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ci: ci.value.trim()})
-  })
-  .then(r => r.json())
-  .then(d => {
-    datos.innerHTML = d.existe ?
-      "<div class='success'>✔ " + d.nombre + "</div>" :
-      "<div class='error'>CI inválido</div>";
+let anomaliaIndex = 1;
+
+function agregarAnomalia() {
+  anomaliaIndex++;
+  const container = document.getElementById('anomalias-container');
+  const nuevaAnomalia = document.createElement('div');
+  nuevaAnomalia.className = 'anomalia-group';
+  nuevaAnomalia.innerHTML = `
+    <hr>
+    <h4>Anomalía ${anomaliaIndex}</h4>
+    <div class="anomalia-row">
+      <label>Descripción de anomalía</label>
+      <textarea placeholder="Describe la anomalía"></textarea>
+    </div>
+    <div class="anomalia-row">
+      <label>¿Cuál fue la posible causa de la anomalía?</label>
+      <textarea placeholder="Indica la causa posible"></textarea>
+    </div>
+    <div class="anomalia-row">
+      <label>¿Qué se hizo para corregir?</label>
+      <textarea placeholder="Describe las acciones tomadas"></textarea>
+    </div>
+    <div class="anomalia-row">
+      <label>¿Qué es lo que se requiere?</label>
+      <textarea placeholder="Indica los requerimientos"></textarea>
+    </div>
+    <div class="anomalia-row">
+      <label>Imagen de la anomalía</label>
+      <input type="file" accept="image/*" class="imagen-anomalia">
+    </div>
+    <button class="remove-btn" onclick="removerAnomalia(this)">Remover anomalía</button>
+  `;
+  container.appendChild(nuevaAnomalia);
+}
+
+function removerAnomalia(btn) {
+  btn.parentElement.remove();
+  anomaliaIndex--;
+  // Reenumerar
+  const groups = document.querySelectorAll('.anomalia-group');
+  groups.forEach((group, index) => {
+    const h4 = group.querySelector('h4');
+    if (h4) h4.textContent = `Anomalía ${index + 2}`;
   });
 }
 
 function limpiarFormulario(){
   ci.value = '';
-  descripcion.value = '';
-  motivo_anomalia.value = '';
-  correccion_hecha.value = '';
-  requerido.value = '';
-  imagen.value = '';
+  document.getElementById('anomalias-container').innerHTML = `
+    <div class="anomalia-group">
+      <div class="anomalia-row">
+        <label>Descripción de anomalía</label>
+        <textarea placeholder="Describe la anomalía"></textarea>
+      </div>
+      <div class="anomalia-row">
+        <label>¿Cuál fue la posible causa de la anomalía?</label>
+        <textarea placeholder="Indica la causa posible"></textarea>
+      </div>
+      <div class="anomalia-row">
+        <label>¿Qué se hizo para corregir?</label>
+        <textarea placeholder="Describe las acciones tomadas"></textarea>
+      </div>
+      <div class="anomalia-row">
+        <label>¿Qué es lo que se requiere?</label>
+        <textarea placeholder="Indica los requerimientos"></textarea>
+      </div>
+      <div class="anomalia-row">
+        <label>Imagen de la anomalía</label>
+        <input type="file" accept="image/*" class="imagen-anomalia">
+      </div>
+    </div>
+  `;
+  anomaliaIndex = 1;
   datos.innerHTML = '';
 }
 
 function guardar(){
-  const datosRequeridos = [
-    {campo: ci.value.trim(), mensaje: 'CI'},
-    {campo: descripcion.value.trim(), mensaje: 'Descripción'},
-    {campo: motivo_anomalia.value.trim(), mensaje: 'Motivo o causa de anomalía'},
-    {campo: correccion_hecha.value.trim(), mensaje: 'Qué se hizo para corregir'},
-    {campo: requerido.value.trim(), mensaje: 'Qué se requiere'}
-  ];
+  const ciValue = ci.value.trim();
+  if (!ciValue) {
+    mensaje.innerHTML = "<div class='error'>Por favor ingresa CI.</div>";
+    return;
+  }
 
-  const imagenSeleccionada = imagen.files[0];
+  const anomalias = [];
+  const groups = document.querySelectorAll('.anomalia-group');
+  groups.forEach((group, index) => {
+    const textareas = group.querySelectorAll('textarea');
+    const imagenInput = group.querySelector('.imagen-anomalia');
+    if (textareas.length === 4 && imagenInput && imagenInput.files[0]) {
+      const [descripcion, causa, correccion, requerido] = textareas;
+      if (descripcion.value.trim() && causa.value.trim() && correccion.value.trim() && requerido.value.trim()) {
+        anomalias.push({
+          descripcion: descripcion.value.trim(),
+          causa: causa.value.trim(),
+          correccion: correccion.value.trim(),
+          requerido: requerido.value.trim(),
+          imagen: imagenInput.files[0]
+        });
+      }
+    }
+  });
 
-  if (!datosRequeridos.every(item => item.campo) || !imagenSeleccionada) {
-    mensaje.innerHTML = "<div class='error'>Por favor completa todos los campos y carga una imagen.</div>";
+  if (anomalias.length === 0) {
+    mensaje.innerHTML = "<div class='error'>Por favor completa al menos una anomalía con todos los campos e imagen.</div>";
     return;
   }
 
   const formData = new FormData();
-  formData.append('ci', ci.value.trim());
-  formData.append('descripcion', descripcion.value.trim());
-  formData.append('motivo_anomalia', motivo_anomalia.value.trim());
-  formData.append('correccion_hecha', correccion_hecha.value.trim());
-  formData.append('requerido', requerido.value.trim());
-  formData.append('imagen', imagenSeleccionada);
+  formData.append('ci', ciValue);
+  anomalias.forEach((anomalia, index) => {
+    formData.append(`anomalia_${index}`, JSON.stringify({
+      descripcion: anomalia.descripcion,
+      causa: anomalia.causa,
+      correccion: anomalia.correccion,
+      requerido: anomalia.requerido
+    }));
+    formData.append(`imagen_${index}`, anomalia.imagen);
+  });
 
   fetch('/guardar', {
     method: 'POST',
@@ -105,7 +201,7 @@ function guardar(){
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'informe_' + ci.value.trim() + '.xlsx';
+    a.download = 'informe_' + ciValue + '.xlsx';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -116,6 +212,38 @@ function guardar(){
   })
   .catch(error => {
     mensaje.innerHTML = "<div class='error'>" + error.message + "</div>";
+  });
+}
+
+function validar(){
+  const ciValue = ci.value.trim();
+  console.log('Validando CI:', ciValue);
+  if (!ciValue) {
+    datos.innerHTML = "<div class='error'>Ingresa un CI válido</div>";
+    return;
+  }
+  datos.innerHTML = "Validando...";
+  fetch('/validar_ci', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ci: ciValue})
+  })
+  .then(r => {
+    console.log('Respuesta status:', r.status);
+    if (!r.ok) {
+      throw new Error('Error en la validación: ' + r.status);
+    }
+    return r.json();
+  })
+  .then(d => {
+    console.log('Respuesta validación:', d);
+    datos.innerHTML = d.existe ?
+      "<div class='success'>✔ " + d.nombre + "</div>" :
+      "<div class='error'>CI inválido</div>";
+  })
+  .catch(error => {
+    console.error('Error en validar:', error);
+    datos.innerHTML = "<div class='error'>Error al validar CI: " + error.message + "</div>";
   });
 }
 </script>

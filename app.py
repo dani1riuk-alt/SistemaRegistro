@@ -3,6 +3,7 @@ import sqlite3
 import datetime
 import os
 import time
+import json
 
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image
@@ -110,14 +111,28 @@ def validar_ci():
 @app.route('/guardar', methods=['POST'])
 def guardar():
     ci = request.form.get('ci', '').strip()
-    descripcion = request.form.get('descripcion', '').strip()
-    motivo_anomalia = request.form.get('motivo_anomalia', '').strip()
-    correccion_hecha = request.form.get('correccion_hecha', '').strip()
-    requerido = request.form.get('requerido', '').strip()
-    imagen = request.files.get('imagen')
 
-    if not ci or not descripcion or not motivo_anomalia or not correccion_hecha or not requerido or not imagen:
-        return "Por favor completa todos los campos y carga una imagen", 400
+    if not ci:
+        return "Por favor ingresa CI", 400
+
+    anomalias = []
+    imagenes = []
+    index = 0
+    while True:
+        anomalia_json = request.form.get(f'anomalia_{index}')
+        imagen = request.files.get(f'imagen_{index}')
+        if not anomalia_json or not imagen:
+            break
+        try:
+            anomalia = json.loads(anomalia_json)
+            anomalias.append(anomalia)
+            imagenes.append(imagen)
+            index += 1
+        except:
+            break
+
+    if not anomalias:
+        return "Debe haber al menos una anomalía completa con imagen", 400
 
     db = get_db()
     cursor = db.cursor()
@@ -127,46 +142,68 @@ def guardar():
         db.close()
         return "CI NO VALIDO", 400
 
-    nombre_archivo = str(int(time.time())) + ".png"
-    ruta = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-    imagen.save(ruta)
-
     ahora = datetime.datetime.now()
-
-    cursor.execute("""
-        INSERT INTO registros (fecha, hora, ci, descripcion, motivo_anomalia, correccion_hecha, requerido, imagen_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        str(ahora.date()),
-        str(ahora.time()),
-        ci,
-        descripcion,
-        motivo_anomalia,
-        correccion_hecha,
-        requerido,
-        ruta
-    ))
-    db.commit()
+    fecha = str(ahora.date())
+    hora = str(ahora.time())
 
     cursor.execute("SELECT nombre FROM trabajadores WHERE ci=?", (ci,))
     nombre = cursor.fetchone()[0]
+
+    rutas_imagenes = []
+    for i, imagen in enumerate(imagenes):
+        nombre_archivo = f"{int(time.time())}_{i}.png"
+        ruta = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
+        imagen.save(ruta)
+        rutas_imagenes.append(ruta)
+
+    # Insertar cada anomalía como un registro separado
+    for i, anomalia in enumerate(anomalias):
+        cursor.execute("""
+            INSERT INTO registros (fecha, hora, ci, descripcion, motivo_anomalia, correccion_hecha, requerido, imagen_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            fecha,
+            hora,
+            ci,
+            anomalia['descripcion'],
+            anomalia['causa'],
+            anomalia['correccion'],
+            anomalia['requerido'],
+            rutas_imagenes[i]
+        ))
+
+    db.commit()
     db.close()
 
+    # Generar Excel con todas las anomalías
     wb = Workbook()
     ws = wb.active
     ws.title = "Informe"
 
-    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción", "Motivo de Anomalía", "Corrección Hecha", "Requerido", "Imagen"])
-    ws.append([str(ahora.date()), str(ahora.time()), ci, nombre, descripcion, motivo_anomalia, correccion_hecha, requerido, ""])
+    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción de anomalía", "¿Cuál fue la posible causa de la anomalía?", "¿Qué se hizo para corregir?", "¿Qué es lo que se requiere?", "Imagen"])
 
-    try:
-        if os.path.exists(ruta):
-            img = Image(ruta)
-            img.width = 150
-            img.height = 120
-            ws.add_image(img, 'I2')
-    except Exception:
-        pass
+    fila = 2
+    for i, anomalia in enumerate(anomalias):
+        ws.cell(row=fila, column=1, value=fecha)
+        ws.cell(row=fila, column=2, value=hora)
+        ws.cell(row=fila, column=3, value=ci)
+        ws.cell(row=fila, column=4, value=nombre)
+        ws.cell(row=fila, column=5, value=anomalia['descripcion'])
+        ws.cell(row=fila, column=6, value=anomalia['causa'])
+        ws.cell(row=fila, column=7, value=anomalia['correccion'])
+        ws.cell(row=fila, column=8, value=anomalia['requerido'])
+        ws.cell(row=fila, column=9, value="")
+
+        try:
+            if os.path.exists(rutas_imagenes[i]):
+                img = Image(rutas_imagenes[i])
+                img.width = 150
+                img.height = 120
+                ws.add_image(img, f'I{fila}')
+        except Exception:
+            pass
+
+        fila += 1
 
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 10
@@ -177,10 +214,13 @@ def guardar():
     ws.column_dimensions['G'].width = 40
     ws.column_dimensions['H'].width = 35
     ws.column_dimensions['I'].width = 20
-    ws.row_dimensions[2].height = 120
 
-    for cell in ws[2]:
-        cell.alignment = Alignment(wrap_text=True)
+    for i in range(2, fila):
+        ws.row_dimensions[i].height = 120
+
+    for row in ws.iter_rows(min_row=2, max_row=fila-1, min_col=1, max_col=8):
+        for cell in row:
+            cell.alignment = Alignment(wrap_text=True)
 
     archivo = f"informe_{ci}_{ahora.strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(archivo)
@@ -209,7 +249,7 @@ def exportar_excel():
     ws = wb.active
     ws.title = "Registros"
 
-    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción", "Motivo de Anomalía", "Corrección Hecha", "Requerido", "Imagen"])
+    ws.append(["Fecha", "Hora", "CI", "Nombre", "Descripción de anomalía", "¿Cuál fue la posible causa de la anomalía?", "¿Qué se hizo para corregir?", "¿Qué es lo que se requiere?", "Imagen"])
 
     db = get_db()
     cursor = db.cursor()
