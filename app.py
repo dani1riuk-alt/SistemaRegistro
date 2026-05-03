@@ -143,8 +143,8 @@ def guardar():
         return "CI NO VALIDO", 400
 
     ahora = datetime.datetime.now()
-    fecha = str(ahora.date())
-    hora = str(ahora.time())
+    fecha = ahora.strftime('%Y-%m-%d')
+    hora = ahora.strftime('%H:%M')
 
     cursor.execute("SELECT nombre FROM trabajadores WHERE ci=?", (ci,))
     nombre = cursor.fetchone()[0]
@@ -222,7 +222,7 @@ def guardar():
         for cell in row:
             cell.alignment = Alignment(wrap_text=True)
 
-    archivo = f"informe_{ci}_{ahora.strftime('%Y%m%d_%H%M%S')}.xlsx"
+    archivo = f"informe_{ci}_{ahora.strftime('%Y%m%d_%H%M')}.xlsx"
     wb.save(archivo)
 
     return send_file(archivo, as_attachment=True)
