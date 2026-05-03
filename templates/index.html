@@ -53,7 +53,7 @@ button:hover { opacity:0.95; }
     </div>
     <div class="anomalia-row">
       <label>Imagen de la anomalía</label>
-      <input type="file" accept="image/*" class="imagen-anomalia">
+      <input type="file" accept="image/*" capture="environment" class="imagen-anomalia">
     </div>
   </div>
 </div>
@@ -99,7 +99,7 @@ function agregarAnomalia() {
     </div>
     <div class="anomalia-row">
       <label>Imagen de la anomalía</label>
-      <input type="file" accept="image/*" class="imagen-anomalia">
+      <input type="file" accept="image/*" capture="environment" class="imagen-anomalia">
     </div>
     <button class="remove-btn" onclick="removerAnomalia(this)">Remover anomalía</button>
   `;
@@ -139,7 +139,7 @@ function limpiarFormulario(){
       </div>
       <div class="anomalia-row">
         <label>Imagen de la anomalía</label>
-        <input type="file" accept="image/*" class="imagen-anomalia">
+        <input type="file" accept="image/*" capture="environment" class="imagen-anomalia">
       </div>
     </div>
   `;
