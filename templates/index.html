@@ -18,12 +18,14 @@ button:hover { opacity:0.95; }
 .success{color:green;} .error{color:red;}
 .add-btn { background:#28a745; margin-bottom: 20px;}
 .remove-btn { background:#dc3545; width: auto; margin-left: 10px; padding: 5px 10px;}
+.file-upload-btn { background:#17a2b8; color:white; padding:10px; border-radius:4px; cursor:pointer; display:inline-block; margin-top:10px;}
+.file-upload-btn:hover { opacity:0.9; }
 </style>
 </head>
 
 <body>
 
-<div class="header">Sistema de Registro</div>
+<div class="header">Registro de anomalias COBEE</div>
 
 <div class="container">
 <div class="card">
@@ -50,7 +52,8 @@ button:hover { opacity:0.95; }
     </div>
     <div class="anomalia-row">
       <label>Imagen de la anomalía</label>
-      <input type="file" accept="image/*" capture="environment" class="imagen-anomalia">
+      <label for="imagen-0" class="file-upload-btn">Subir Foto</label>
+      <input type="file" id="imagen-0" accept="image/*" capture="environment" class="imagen-anomalia" style="display: none;">
     </div>
   </div>
 </div>
@@ -95,7 +98,8 @@ function agregarAnomalia() {
     </div>
     <div class="anomalia-row">
       <label>Imagen de la anomalía</label>
-      <input type="file" accept="image/*" capture="environment" class="imagen-anomalia">
+      <label for="imagen-${anomaliaIndex}" class="file-upload-btn">Subir Foto</label>
+      <input type="file" id="imagen-${anomaliaIndex}" accept="image/*" capture="environment" class="imagen-anomalia" style="display: none;">
     </div>
     <button class="remove-btn" onclick="removerAnomalia(this)">Remover anomalía</button>
   `;
@@ -135,7 +139,8 @@ function limpiarFormulario(){
       </div>
       <div class="anomalia-row">
         <label>Imagen de la anomalía</label>
-        <input type="file" accept="image/*" capture="environment" class="imagen-anomalia">
+        <label for="imagen-0" class="file-upload-btn">Subir Foto</label>
+        <input type="file" id="imagen-0" accept="image/*" capture="environment" class="imagen-anomalia" style="display: none;">
       </div>
     </div>
   `;
