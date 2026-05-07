@@ -52,7 +52,10 @@ button:hover { opacity:0.95; }
     </div>
     <div class="anomalia-row">
       <label>Imagen de la anomalía</label>
-      <label for="imagen-0" class="file-upload-btn">Subir Foto</label>
+      <div>
+        <button type="button" class="file-upload-btn" onclick="abrirInput(0, false)">Galería</button>
+        <button type="button" class="file-upload-btn" onclick="abrirInput(0, true)">Cámara</button>
+      </div>
       <input type="file" id="imagen-0" accept="image/*" class="imagen-anomalia" style="display: none;">
     </div>
   </div>
@@ -98,7 +101,10 @@ function agregarAnomalia() {
     </div>
     <div class="anomalia-row">
       <label>Imagen de la anomalía</label>
-      <label for="imagen-${anomaliaIndex}" class="file-upload-btn">Subir Foto</label>
+      <div>
+        <button type="button" class="file-upload-btn" onclick="abrirInput(${anomaliaIndex}, false)">Galería</button>
+        <button type="button" class="file-upload-btn" onclick="abrirInput(${anomaliaIndex}, true)">Cámara</button>
+      </div>
       <input type="file" id="imagen-${anomaliaIndex}" accept="image/*" class="imagen-anomalia" style="display: none;">
     </div>
     <button class="remove-btn" onclick="removerAnomalia(this)">Remover anomalía</button>
@@ -139,12 +145,26 @@ function limpiarFormulario(){
       </div>
       <div class="anomalia-row">
         <label>Imagen de la anomalía</label>
-        <label for="imagen-0" class="file-upload-btn">Subir Foto</label>
-        <input type="file" id="imagen-0" accept="image/*" capture="environment" class="imagen-anomalia" style="display: none;">
+        <div>
+          <button type="button" class="file-upload-btn" onclick="abrirInput(0, false)">Galería</button>
+          <button type="button" class="file-upload-btn" onclick="abrirInput(0, true)">Cámara</button>
+        </div>
+        <input type="file" id="imagen-0" accept="image/*" class="imagen-anomalia" style="display: none;">
       </div>
     </div>
   `;
   anomaliaIndex = 1;
+}
+
+function abrirInput(index, usarCamara) {
+  const input = document.getElementById(`imagen-${index}`);
+  if (!input) return;
+  if (usarCamara) {
+    input.setAttribute('capture', 'environment');
+  } else {
+    input.removeAttribute('capture');
+  }
+  input.click();
 }
 
 function guardar(){
