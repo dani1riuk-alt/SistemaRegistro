@@ -18,8 +18,10 @@ button:hover { opacity:0.95; }
 .success{color:green;} .error{color:red;}
 .add-btn { background:#28a745; margin-bottom: 20px;}
 .remove-btn { background:#dc3545; width: auto; margin-left: 10px; padding: 5px 10px;}
-.file-upload-btn { background:#17a2b8; color:white; padding:10px; border-radius:4px; cursor:pointer; display:inline-block; margin-top:10px;}
+.file-upload-btn { background:#17a2b8; color:white; padding:10px; border-radius:4px; cursor:pointer; display:inline-block; margin-top:10px; margin-right: 10px;}
 .file-upload-btn:hover { opacity:0.9; }
+.file-status { display:block; margin-top: 8px; color: #28a745; font-size: 0.95rem; }
+.file-status.empty { color: #666; }
 </style>
 </head>
 
@@ -56,7 +58,8 @@ button:hover { opacity:0.95; }
         <button type="button" class="file-upload-btn" onclick="abrirInput(0, false)">Galería</button>
         <button type="button" class="file-upload-btn" onclick="abrirInput(0, true)">Cámara</button>
       </div>
-      <input type="file" id="imagen-0" accept="image/*" class="imagen-anomalia" style="display: none;">
+      <input type="file" id="imagen-0" accept="image/*" class="imagen-anomalia" onchange="actualizarEstadoImagen(0)" style="display: none;">
+      <span id="status-imagen-0" class="file-status empty"></span>
     </div>
   </div>
 </div>
@@ -105,7 +108,8 @@ function agregarAnomalia() {
         <button type="button" class="file-upload-btn" onclick="abrirInput(${anomaliaIndex}, false)">Galería</button>
         <button type="button" class="file-upload-btn" onclick="abrirInput(${anomaliaIndex}, true)">Cámara</button>
       </div>
-      <input type="file" id="imagen-${anomaliaIndex}" accept="image/*" class="imagen-anomalia" style="display: none;">
+      <input type="file" id="imagen-${anomaliaIndex}" accept="image/*" class="imagen-anomalia" onchange="actualizarEstadoImagen(${anomaliaIndex})" style="display: none;">
+      <span id="status-imagen-${anomaliaIndex}" class="file-status empty"></span>
     </div>
     <button class="remove-btn" onclick="removerAnomalia(this)">Remover anomalía</button>
   `;
@@ -149,7 +153,8 @@ function limpiarFormulario(){
           <button type="button" class="file-upload-btn" onclick="abrirInput(0, false)">Galería</button>
           <button type="button" class="file-upload-btn" onclick="abrirInput(0, true)">Cámara</button>
         </div>
-        <input type="file" id="imagen-0" accept="image/*" class="imagen-anomalia" style="display: none;">
+        <input type="file" id="imagen-0" accept="image/*" class="imagen-anomalia" onchange="actualizarEstadoImagen(0)" style="display: none;">
+        <span id="status-imagen-0" class="file-status empty"></span>
       </div>
     </div>
   `;
@@ -165,6 +170,20 @@ function abrirInput(index, usarCamara) {
     input.removeAttribute('capture');
   }
   input.click();
+}
+
+function actualizarEstadoImagen(index) {
+  const input = document.getElementById(`imagen-${index}`);
+  const status = document.getElementById(`status-imagen-${index}`);
+  if (!status) return;
+  if (input && input.files && input.files.length > 0) {
+    const nombreArchivo = input.files[0].name || 'Foto cargada';
+    status.textContent = `Archivo seleccionado: ${nombreArchivo}`;
+    status.classList.remove('empty');
+  } else {
+    status.textContent = '';
+    status.classList.add('empty');
+  }
 }
 
 function guardar(){
